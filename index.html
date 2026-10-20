@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AutoDiag</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#0b1220;color:white;font-family:Arial,sans-serif}
+header{padding:20px;background:#172339;display:flex;justify-content:space-between;align-items:center}
+.logo{font-size:25px;font-weight:bold;color:#32e6ad}
+main{max-width:650px;margin:auto;padding:15px}
+.hero{text-align:center;padding:25px 5px}
+.hero h1{font-size:28px}
+.card{background:#19283e;padding:20px;border-radius:18px;margin-bottom:15px}
+h2{font-size:19px;margin-top:0}
+p{line-height:1.6;color:#c1ccdb}
+select,input{width:100%;padding:13px;margin:7px 0;background:#101b2d;color:white;border:1px solid #455875;border-radius:10px}
+header select{width:auto}
+button{width:100%;padding:15px;background:#32e6ad;color:#09261d;border:0;border-radius:12px;font-weight:bold;margin-top:10px;cursor:pointer}
+.secondary{background:#334762;color:white}
+.result{background:#101b2d;padding:15px;border-radius:12px;margin-top:12px;line-height:1.7}
+.result strong{color:#32e6ad}
+small{color:#adbed3}
+footer{text-align:center;padding:25px;color:#adbed3}
+</style>
+</head>
+<body>
+<header>
+<div class="logo">🚗 AutoDiag</div>
+<select id="lang" onchange="translateApp()">
+<option value="es">🇪🇸 Español</option>
+<option value="ar">🇲🇦 العربية</option>
+</select>
+</header>
+
+<main>
+<div class="hero">
+<div style="font-size:65px">🚘</div>
+<h1 id="title">Diagnóstico inteligente</h1>
+<p id="subtitle">Diagnóstico de coches OBD2</p>
+</div>
+
+<div class="card">
+<h2 id="carTitle">🚙 Selecciona tu coche</h2>
+<select id="brand"></select>
+<input id="model" placeholder="Modelo">
+</div>
+
+<div class="card">
+<h2 id="diagTitle">🔍 Diagnóstico</h2>
+<small id="demoInfo">Modo de prueba sin OBD2</small>
+<button id="demoBtn" onclick="runDemo()">▶ Iniciar DEMO</button>
+<button class="secondary" id="realBtn" onclick="realOBD()">🔌 Conectar OBD2</button>
+<div id="diagnosis"></div>
+</div>
+
+<div class="card">
+<h2 id="libraryTitle">📚 Códigos de avería</h2>
+<input id="search" placeholder="P0300" oninput="searchCode()">
+<div id="results"></div>
+</div>
+
+<div class="card">
+<h2 id="dataTitle">📊 Datos del motor</h2>
+<div id="live" class="result">RPM: -- | °C: --</div>
+<button class="secondary" id="liveBtn" onclick="liveDemo()">Simular datos</button>
+</div>
+</main>
+
+<footer>AutoDiag V1 · Demo</footer>
+
+<script>
+const brands=[
+"Audi","BMW","Mercedes-Benz","Volkswagen",
+"Renault","Peugeot","Citroën","Dacia",
+"Seat","Cupra","Skoda","Opel","Ford",
+"Fiat","Toyota","Honda","Hyundai","Kia",
+"Nissan","Mazda","Volvo","Suzuki","Jeep",
+"Land Rover","Mini","Porsche","Lexus",
+"Mitsubishi","Alfa Romeo","Chevrolet","BYD"
+];
+
+const db=[
+["P0300","Fallos de encendido aleatorios","خلل عشوائي في احتراق المحرك",
+"Bujías, bobinas o inyectores","البواجي أو الكويلات أو البخاخات"],
+["P0420","Baja eficiencia del catalizador","ضعف كفاءة الكاتاليزور",
+"Catalizador, fugas o sondas lambda","الكاتاليزور أو التسربات أو حساس الأكسجين"],
+["P0171","Mezcla demasiado pobre","خليط الهواء والوقود فقير",
+"Fugas de aire, MAF o combustible","تسرب الهواء أو حساس MAF أو نقص الوقود"],
+["P0101","Problema de rendimiento MAF","خلل في قياس تدفق الهواء",
+"Sensor MAF, cableado o admisión","حساس الهواء أو الأسلاك أو مجرى الهواء"],
+["P0115","Circuito de temperatura del refrigerante","خلل في دائرة حساس حرارة المحرك",
+"Sensor ECT, conectores o cableado","حساس الحرارة أو التوصيلات أو الأسلاك"],
+["P0130","Circuito del sensor de oxígeno","خلل في دائرة حساس الأكسجين",
+"Sonda lambda, cableado o conectores","حساس الأكسجين أو الأسلاك أو التوصيلات"]
+];
+
+const words={
+es:{
+title:"Diagnóstico inteligente",
+subtitle:"Diagnóstico de coches OBD2",
+carTitle:"🚙 Selecciona tu coche",
+diagTitle:"🔍 Diagnóstico",
+demoInfo:"Modo de prueba sin OBD2",
+demoBtn:"▶ Iniciar DEMO",
+realBtn:"🔌 Conectar OBD2",
+libraryTitle:"📚 Códigos de avería",
+dataTitle:"📊 Datos del motor",
+liveBtn:"Simular datos",
+cause:"Posibles causas",
+found:"Diagnóstico simulado: 2 averías",
+notFound:"Código no encontrado en esta versión",
+real:"La conexión real todavía no está disponible. Necesita un adaptador compatible y desarrollo adicional.",
+warning:"Datos de demostración, NO leídos de un coche."
+},
+ar:{
+title:"التشخيص الذكي للسيارات",
+subtitle:"تشخيص أعطال السيارات OBD2",
+carTitle:"🚙 اختاري السيارة",
+diagTitle:"🔍 تشخيص الأعطال",
+demoInfo:"وضع التجربة بدون جهاز OBD2",
+demoBtn:"▶ بدء التجربة",
+realBtn:"🔌 الاتصال بجهاز OBD2",
+libraryTitle:"📚 مكتبة أكواد الأعطال",
+dataTitle:"📊 بيانات المحرك",
+liveBtn:"محاكاة البيانات",
+cause:"الأسباب المحتملة",
+found:"تشخيص تجريبي: عطلان",
+notFound:"الكود غير موجود في هذه النسخة",
+real:"الاتصال الحقيقي غير متوفر بعد. يحتاج جهازاً متوافقاً وبرمجة إضافية.",
+warning:"بيانات تجريبية وليست مقروءة من سيارة."
+}
+};
+
+let language="es";
+
+const el=id=>document.getElementById(id);
+
+function translateApp(){
+ language=el("lang").value;
+ document.documentElement.lang=language;
+ document.documentElement.dir=language==="ar"?"rtl":"ltr";
+ for(const id of [
+ "title","subtitle","carTitle","diagTitle",
+ "demoInfo","demoBtn","realBtn",
+ "libraryTitle","dataTitle","liveBtn"
+ ]){
+ el(id).textContent=words[language][id];
+ }
+ searchCode();
+}
+
+function showCode(item){
+ const ar=language==="ar";
+ const title=ar?item[2]:item[1];
+ const cause=ar?item[4]:item[3];
+ const box=document.createElement("div");
+ box.className="result";
+ const strong=document.createElement("strong");
+ strong.textContent=item[0];
+ const h=document.createElement("h3");
+ h.textContent=title;
+ const p=document.createElement("p");
+ p.textContent=words[language].cause+": "+cause;
+ box.append(strong,h,p);
+ return box;
+}
+
+function runDemo(){
+ const target=el("diagnosis");
+ target.replaceChildren();
+ const note=document.createElement("p");
+ note.textContent=words[language].found+
+ " — "+words[language].warning;
+ target.append(note);
+ target.append(showCode(db[0]),showCode(db[1]));
+}
+
+function realOBD(){
+ alert(words[language].real);
+}
+
+function searchCode(){
+ const value=el("search").value.trim().toUpperCase();
+ const target=el("results");
+ target.replaceChildren();
+ if(!value)return;
+ const matches=db.filter(x=>x[0].includes(value));
+ if(!matches.length){
+ target.textContent=words[language].notFound;
+ return;
+ }
+ matches.forEach(x=>target.append(showCode(x)));
+}
+
+function liveDemo(){
+ const rpm=Math.floor(750+Math.random()*1800);
+ const temp=Math.floor(80+Math.random()*16);
+ el("live").textContent=
+ "DEMO | RPM: "+rpm+" | "+temp+" °C";
+}
+
+brands.forEach(name=>{
+ const option=document.createElement("option");
+ option.value=name;
+ option.textContent=name;
+ el("brand").append(option);
+});
+
+translateApp();
+</script>
+</body>
+</html>
